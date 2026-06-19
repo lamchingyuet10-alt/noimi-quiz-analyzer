@@ -616,8 +616,8 @@
 
   <script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbwZ4IepgvVlcun3CX57gqG9hf86Rn5CWPdKvWJgl8jCRAs1Gbdw24UoW4zVIqo__h6UYA/exec";
+
     // ─── データ構造 ───────────────────────────────────────────
-    // 初期データ（ローカルストレージが空の場合に使用）
     const defaultSurveys = [
       {
         id: 0,
@@ -645,14 +645,10 @@
       }
     ];
 
-    // 【追加】ローカルストレージからデータを読み込み、無ければ初期データをセット
     let surveys = JSON.parse(localStorage.getItem('noemie_surveys')) || defaultSurveys;
-
-    // 【追加】アクティブなアンケートIDも保存されていれば復元
     let activeSurveyId = parseInt(localStorage.getItem('noemie_active_id')) || surveys[0].id;
     let scoreChart = null;
 
-    // 【追加】データをローカルストレージに保存する共通関数
     function saveToStorage() {
       localStorage.setItem('noemie_surveys', JSON.stringify(surveys));
       localStorage.setItem('noemie_active_id', activeSurveyId.toString());
@@ -662,7 +658,6 @@
     function get(id) { return document.getElementById(id); }
 
     // ─── 統計計算 ───────────────────────────────────────────
-    // （既存の getOptionStats はそのまま）
     function getOptionStats(survey) {
       return survey.questions.map((q, qi) => {
         const optionData = {};
@@ -677,9 +672,230 @@
       });
     }
 
-    // ─── 概要・問題別分析・推奨選択肢 ─────────────────────────
-    // （既存の renderOverview, renderQuestions, renderRanking はそのまま）
-    // ...[中略]...
+    // ─── 概要の描画 ───────────────────────────────────────────
+    function renderOverview() {
+      const sv = getSurvey();
+      const count = sv.responses.length;
+      const avg = count ? Math.round(sv.responses.reduce((s, r) => s + r.score, 0) / count) : 0;
+      const high = count ? Math.max(...sv.responses.map(r => r.score)) : 0;
+
+      const surveyItems = surveys.map(s => {
+        const isActive = s.id === activeSurveyId;
+        const isRenaming = s.id === renamingId;
+
+        let nameField = `<span class="survey-name" onclick="switchSurvey(${s.id})">${s.name}</span>`;
+        if (isRenaming) {
+          nameField = `
+            <div style="display:flex;gap:5px;flex:1;">
+              <input type="text" id="rename-input-${s.id}" value="${s.name}" style="padding:4px 8px;font-size:13px;">
+              <button class="survey-del" onclick="applyRename(${s.id})" style="color:#0a5e44;border-color:#5DCAA5;">保存</button>
+              <button class="survey-del" onclick="cancelRename()">取消</button>
+            </div>`;
+        }
+
+        return `
+          <div class="survey-item ${isActive ? 'active-survey' : ''}">
+            ${nameField}
+            <span class="survey-meta">${s.responses.length}件の回答</span>
+            ${!isRenaming ? `<button class="survey-del" onclick="startRename(${s.id})">改名</button>` : ''}
+            ${surveys.length > 1 ? `<button class="survey-del" onclick="deleteSurvey(${s.id})">削除</button>` : ''}
+          </div>`;
+      }).join('');
+
+      const qBuilderRows = newSurveyQuestions.map((q, i) => `
+        <div class="q-builder-row">
+          ${newSurveyQuestions.length > 1 ? `<button class="btn-del-q" onclick="removeNewQ(${i})">削除</button>` : ''}
+          <div class="q-num-label">問題 ${i + 1}</div>
+          <input type="text" placeholder="質問文を入力してください" value="${q.text}" oninput="updateNewQ(${i}, 'text', this.value)">
+          <div class="options-grid">
+            ${['A', 'B', 'C', 'D'].map(o => `
+              <div class="opt-input-wrap">
+                <span class="opt-letter">${o}</span>
+                <input type="text" placeholder="選択肢 ${o}" value="${q.options[o]}" oninput="updateNewQ(${i}, 'opt_${o}', this.value)">
+              </div>`).join('')}
+          </div>
+        </div>`).join('');
+
+      get('page-overview').innerHTML = `
+        <div class="metrics">
+          <div class="metric"><div class="metric-label">回答件数</div><div class="metric-value">${count}<span style="font-size:13px;font-weight:400;margin-left:2px;">件</span></div></div>
+          <div class="metric"><div class="metric-label">平均正解率</div><div class="metric-value">${avg}<span style="font-size:13px;font-weight:400;margin-left:2px;">%</span></div></div>
+          <div class="metric"><div class="metric-label">最高正解率</div><div class="metric-value">${high}<span style="font-size:13px;font-weight:400;margin-left:2px;">%</span></div></div>
+        </div>
+        <div class="chart-wrap"><canvas id="scoreChart" height="140"></canvas></div>
+        
+        <div style="margin-top:2rem;">
+          <h3 style="font-size:14px;font-weight:500;margin-bottom:10px;color:#083d2e;">アンケートの切替</h3>
+          <div class="surveys-list">${surveyItems}</div>
+        </div>
+
+        <div class="new-survey-form" style="margin-top:1.5rem;">
+          <h3>新しいアンケートを作成</h3>
+          <div class="form-row">
+            <div class="form-label">アンケート名</div>
+            <input type="text" id="newSurveyName" placeholder="例: 2026年最新クイズ">
+          </div>
+          <div class="q-builder">
+            <div class="form-label">問題の構成</div>
+            ${qBuilderRows}
+          </div>
+          <button class="btn-add-q" onclick="addNewQ()">＋ 問題を追加する</button>
+          <div style="margin-top:10px;">
+            <button class="btn" onclick="createSurvey()">アンケートを作成して切替</button>
+          </div>
+          <div id="surveyMsg" style="font-size:13px;margin-top:10px;min-height:18px;"></div>
+        </div>`;
+
+      renderChart(sv.responses);
+    }
+
+    function renderChart(responses) {
+      if (scoreChart) scoreChart.destroy();
+      const ctx = get('scoreChart');
+      if (!ctx) return;
+
+      const bins = Array(11).fill(0);
+      responses.forEach(r => { const b = Math.min(10, Math.floor(r.score / 10)); bins[b]++; });
+
+      scoreChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['0%', '10%', '20%', '30%', '40%', '50%', '60%', '70%', '80%', '90%', '100%'],
+          datasets: [{ label: '人数', data: bins, backgroundColor: '#5DCAA5', borderRadius: 4, barPercentage: 0.85 }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#2a7a60', font: { size: 10 } } },
+            y: { grid: { color: '#c8f0e4' }, ticks: { stepSize: 1, color: '#2a7a60', font: { size: 10 } }, beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    // ─── 問題別分析の描画 ─────────────────────────────────────
+    function renderQuestions() {
+      const sv = getSurvey();
+      if (!sv.responses.length) {
+        get('page-questions').innerHTML = '<div class="insight-box">データがまだ無いため、分析を表示できません。「データ追加」タブから回答を入力してください。</div>';
+        return;
+      }
+      const stats = getOptionStats(sv);
+
+      const cards = stats.map(st => {
+        const rows = ['A', 'B', 'C', 'D'].map(opt => {
+          const d = st.optionData[opt];
+          const pct = sv.responses.length ? Math.round((d.count / sv.responses.length) * 100) : 0;
+          const avgS = Math.round(d.avgScore);
+          const isBest = st.best === opt;
+
+          let fillClass = 'none';
+          if (d.count > 0) {
+            if (avgS >= 50) fillClass = 'best';
+            else if (avgS >= 30) fillClass = 'mid';
+            else fillClass = 'low';
+          }
+
+          return `
+            <div class="bar-row">
+              <span class="bar-label">${opt}</span>
+              <span class="bar-option" title="${st.q.options[opt]}">${st.q.options[opt]}</span>
+              <div class="bar-track">
+                <div class="bar-fill ${fillClass}" style="width: ${Math.max(10, pct)}%">
+                  ${d.count > 0 ? `${avgS}%` : ''}
+                </div>
+              </div>
+              <span class="bar-voters">${pct}%</span>
+            </div>`;
+        }).join('');
+
+        const bestText = st.best ? `推奨: ${st.best} (${Math.round(st.optionData[st.best].avgScore)}%)` : 'データ不足';
+
+        return `
+          <div class="q-card">
+            <div class="q-header">
+              <span class="q-title">Q${st.qi + 1}. ${st.q.text}</span>
+              <span class="q-best">${bestText}</span>
+            </div>
+            <div class="bars">${rows}</div>
+          </div>`;
+      }).join('');
+
+      get('page-questions').innerHTML = `
+        <div class="insight-box">
+          グラフ内の数値は、<strong>「その選択肢を選んだ人の平均正解率」</strong>を示しています。<br>
+          緑色に近い選択肢ほど、その回答を選んだユーザー全体の正解率（＝コアファン度）が高いことを表します。
+        </div>
+        ${cards}`;
+    }
+
+    // ─── 推奨選択肢の描画 ─────────────────────────────────────
+    function renderRanking() {
+      const sv = getSurvey();
+      if (!sv.responses.length) {
+        get('page-ranking').innerHTML = '<div class="insight-box">データがまだ無いため、推奨選択肢を算出できません。</div>';
+        return;
+      }
+      const stats = getOptionStats(sv);
+
+      const gridItems = stats.map(st => {
+        if (!st.best) return '';
+        const score = Math.round(st.optionData[st.best].avgScore);
+        let level = 'low';
+        if (score >= 50) level = 'high';
+        else if (score >= 30) level = 'mid';
+
+        return `
+          <div class="rec-card ${level}">
+            <span class="rec-card-q">Q${st.qi + 1}の最適解</span>
+            <span class="rec-card-choice">${st.best}: ${st.q.options[st.best]}</span>
+            <span class="rec-card-label">選んだ人の平均正解率</span>
+            <span class="rec-card-score">${score}%</span>
+          </div>`;
+      }).join('');
+
+      const tableRows = stats.map(st => {
+        return ['A', 'B', 'C', 'D'].map(opt => {
+          const d = st.optionData[opt];
+          const score = Math.round(d.avgScore);
+          let bClass = 'badge-low';
+          if (d.count > 0) {
+            if (score >= 50) bClass = 'badge-best';
+            else if (score >= 30) bClass = 'badge-mid';
+          } else {
+            bClass = 'badge-low';
+          }
+
+          return `
+            <tr>
+              <td style="font-weight:500;color:#2a7a60;">Q${st.qi + 1}</td>
+              <td style="font-weight:500;">${opt}</td>
+              <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${st.q.options[opt]}</td>
+              <td>${d.count}票</td>
+              <td><span class="badge ${bClass}">${d.count > 0 ? `${score}%` : '-'}</span></td>
+            </tr>`;
+        }).join('');
+      }).join('');
+
+      get('page-ranking').innerHTML = `
+        <div class="insight-box">
+          各問題で<strong>「最も平均正解率が高かった選択肢」</strong>のまとめです。この選択肢をすべて選ぶと、最も高得点（推しへの理解度が高い）を取りやすいと推測されます。
+        </div>
+        <div class="rec-grid">${gridItems}</div>
+        
+        <div style="background:#fff;border:1px solid #9adfc8;border-radius:12px;padding:10px;margin-top:1.5rem;overflow-x:auto;">
+          <h3 style="font-size:14px;font-weight:500;margin:6px 10px 12px;color:#083d2e;">全選択肢の期待値一覧</h3>
+          <table>
+            <thead>
+              <tr><th>問題</th><th>選</th><th>選択肢の内容</th><th>投票数</th><th>平均</th></tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+        </div>`;
+    }
 
     // ─── データ追加 ─────────────────────────────────────────
     let addTargetSurveyId = null;
@@ -693,42 +909,42 @@
       ).join('');
 
       const inputs = sv.questions.map((q, i) => `
-    <div class="q-form">
-      <div class="q-form-label">Q${i + 1}. ${q.text}</div>
-      <div class="radios">
-        ${['A', 'B', 'C', 'D'].map(o => `<label><input type="radio" name="q${i}" value="${o}"> ${o}: ${q.options[o]}</label>`).join('')}
-      </div>
-    </div>`).join('');
+        <div class="q-form">
+          <div class="q-form-label">Q${i + 1}. ${q.text}</div>
+          <div class="radios">
+            ${['A', 'B', 'C', 'D'].map(o => `<label><input type="radio" name="q${i}" value="${o}"> ${o}: ${q.options[o]}</label>`).join('')}
+          </div>
+        </div>`).join('');
 
       const dataRows = sv.responses.map((r, i) => `
-    <div class="data-row">
-      <span style="color:#083d2e;font-weight:500;width:70px;">回答者${i + 1}</span>
-      <span style="letter-spacing:2px;">${r.answers.join(' ')}</span>
-      <span style="margin-left:auto;font-weight:500;color:#083d2e;">${r.score}%</span>
-      <button class="del-btn" onclick="deleteResponse(${i})">削除</button>
-    </div>`).join('');
+        <div class="data-row">
+          <span style="color:#083d2e;font-weight:500;width:70px;">回答者${i + 1}</span>
+          <span style="letter-spacing:2px;">${r.answers.join(' ')}</span>
+          <span style="margin-left:auto;font-weight:500;color:#083d2e;">${r.score}%</span>
+          <button class="del-btn" onclick="deleteResponse(${i})">削除</button>
+        </div>`).join('');
 
       get('page-add').innerHTML = `
-    <div class="add-section">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-        <span style="font-size:13px;color:#2a7a60;white-space:nowrap;">対象アンケート:</span>
-        <select onchange="switchAddTarget(this.value)" style="flex:1;padding:6px 10px;font-size:13px;border:1px solid #9adfc8;border-radius:8px;background:#fff;color:#083d2e;cursor:pointer;">
-          ${surveyOptions}
-        </select>
-      </div>
-      <h3 style="font-size:14px;font-weight:500;margin-bottom:14px;color:#083d2e;">新しい回答を追加 — ${sv.name}</h3>
-      ${inputs}
-      <div style="display:flex;align-items:center;gap:10px;margin:14px 0;">
-        <span style="font-size:13px;color:#2a7a60;">正解率 (%):</span>
-        <input type="number" id="newScore" min="0" max="100" step="10" placeholder="例: 40">
-      </div>
-      <button class="btn" onclick="addResponse()">追加する</button>
-      <div id="addMsg" style="font-size:13px;margin-top:10px;min-height:18px;"></div>
-    </div>
-    <div style="margin-top:1.5rem;">
-      <div style="font-size:13px;color:#2a7a60;margin-bottom:8px;">現在のデータ（${sv.responses.length}件）</div>
-      ${dataRows || '<div style="font-size:13px;color:#4aab8a;padding:8px 0;">まだデータがありません</div>'}
-    </div>`;
+        <div class="add-section">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+            <span style="font-size:13px;color:#2a7a60;white-space:nowrap;">対象アンケート:</span>
+            <select onchange="switchAddTarget(this.value)" style="flex:1;padding:6px 10px;font-size:13px;border:1px solid #9adfc8;border-radius:8px;background:#fff;color:#083d2e;cursor:pointer;">
+              ${surveyOptions}
+            </select>
+          </div>
+          <h3 style="font-size:14px;font-weight:500;margin-bottom:14px;color:#083d2e;">新しい回答を追加 — ${sv.name}</h3>
+          ${inputs}
+          <div style="display:flex;align-items:center;gap:10px;margin:14px 0;">
+            <span style="font-size:13px;color:#2a7a60;">正解率 (%):</span>
+            <input type="number" id="newScore" min="0" max="100" step="10" placeholder="例: 40">
+          </div>
+          <button class="btn" onclick="addResponse()">追加する</button>
+          <div id="addMsg" style="font-size:13px;margin-top:10px;min-height:18px;"></div>
+        </div>
+        <div style="margin-top:1.5rem;">
+          <div style="font-size:13px;color:#2a7a60;margin-bottom:8px;">現在のデータ（${sv.responses.length}件）</div>
+          ${dataRows || '<div style="font-size:13px;color:#4aab8a;padding:8px 0;">まだデータがありません</div>'}
+        </div>`;
     }
 
     function switchAddTarget(id) {
@@ -752,7 +968,6 @@
       msg.style.color = '#7ecfb8';
       msg.textContent = '送信中...';
 
-      // 【修正】GASのAPIにデータを送信
       try {
         const response = await fetch(GAS_URL, {
           method: "POST",
@@ -766,8 +981,10 @@
 
         const result = await response.json();
         if (result.result === "success") {
-          // ローカルの画面表示用データにも反映
           sv.responses.push({ answers, score });
+
+          saveToStorage(); // 画面リロード時対策にローカルにも同期
+
           msg.style.color = '#0a5e44';
           msg.textContent = `外部データベースに保存しました！（合計 ${sv.responses.length} 件）`;
           renderAll();
@@ -786,7 +1003,7 @@
       if (!confirm(`回答者${i + 1}のデータを削除しますか？`)) return;
       sv.responses.splice(i, 1);
 
-      saveToStorage(); // 【追加】ローカルストレージへ保存
+      saveToStorage();
 
       renderAll(); renderAdd();
     }
@@ -806,7 +1023,7 @@
       if (sv) sv.name = name;
       renamingId = null;
 
-      saveToStorage(); // 【追加】ローカルストレージへ保存
+      saveToStorage();
 
       renderAll();
       if (addTargetSurveyId === id) renderAdd();
@@ -846,14 +1063,14 @@
       addTargetSurveyId = newId;
       newSurveyQuestions = [{ text: '', options: { A: '', B: '', C: '', D: '' } }];
 
-      saveToStorage(); // 【追加】ローカルストレージへ保存
+      saveToStorage();
 
       renderAll();
     }
 
     function switchSurvey(id) {
       activeSurveyId = id;
-      localStorage.setItem('noemie_active_id', id.toString()); // 【追加】アクティブIDを保存
+      localStorage.setItem('noemie_active_id', id.toString());
       renderAll();
     }
 
@@ -864,7 +1081,7 @@
       if (activeSurveyId === id) activeSurveyId = surveys[0].id;
       if (addTargetSurveyId === id) addTargetSurveyId = surveys[0].id;
 
-      saveToStorage(); // 【追加】ローカルストレージへ保存
+      saveToStorage();
 
       renderAll();
     }
