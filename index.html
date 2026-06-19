@@ -615,6 +615,7 @@
   </div>
 
   <script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwZ4IepgvVlcun3CX57gqG9hf86Rn5CWPdKvWJgl8jCRAs1Gbdw24UoW4zVIqo__h6UYA/exec";
     // ─── データ構造 ───────────────────────────────────────────
     // 初期データ（ローカルストレージが空の場合に使用）
     const defaultSurveys = [
@@ -735,7 +736,7 @@
       renderAdd();
     }
 
-    function addResponse() {
+    async function addResponse() {
       const sv = surveys.find(s => s.id === addTargetSurveyId) || getSurvey();
       const answers = sv.questions.map((_, i) => {
         const sel = document.querySelector(`input[name=q${i}]:checked`);
@@ -744,14 +745,40 @@
       const score = parseInt(get('newScore').value);
       const missing = answers.indexOf(null);
       const msg = get('addMsg');
+
       if (missing !== -1) { msg.style.color = '#c0392b'; msg.textContent = `Q${missing + 1}の選択肢を選んでください`; return; }
       if (isNaN(score) || score < 0 || score > 100) { msg.style.color = '#c0392b'; msg.textContent = '正解率を0〜100で入力してください'; return; }
-      sv.responses.push({ answers, score });
 
-      saveToStorage(); // 【追加】ローカルストレージへ保存
+      msg.style.color = '#7ecfb8';
+      msg.textContent = '送信中...';
 
-      msg.style.color = '#0a5e44'; msg.textContent = `追加しました！（合計 ${sv.responses.length} 件）`;
-      renderAll(); renderAdd();
+      // 【修正】GASのAPIにデータを送信
+      try {
+        const response = await fetch(GAS_URL, {
+          method: "POST",
+          body: JSON.stringify({
+            surveyId: sv.id,
+            surveyName: sv.name,
+            answers: answers,
+            score: score
+          })
+        });
+
+        const result = await response.json();
+        if (result.result === "success") {
+          // ローカルの画面表示用データにも反映
+          sv.responses.push({ answers, score });
+          msg.style.color = '#0a5e44';
+          msg.textContent = `外部データベースに保存しました！（合計 ${sv.responses.length} 件）`;
+          renderAll();
+          renderAdd();
+        } else {
+          throw new Error(result.error);
+        }
+      } catch (error) {
+        msg.style.color = '#c0392b';
+        msg.textContent = '送信に失敗しました: ' + error.toString();
+      }
     }
 
     function deleteResponse(i) {
