@@ -595,6 +595,18 @@
       width: 100%;
       margin-bottom: 1.5rem;
     }
+    
+    .loading-banner {
+      background: #fff7e6;
+      border: 1px solid #ffd591;
+      color: #d46b08;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 1rem;
+      text-align: center;
+      display: none;
+    }
   </style>
 </head>
 
@@ -602,6 +614,9 @@
   <div class="container">
     <h1>ノイミー推しメンクイズ回答分析💎</h1>
     <p class="subtitle">どの選択肢を選ぶと高スコアにつながるかを分析します</p>
+    
+    <div id="loadingBanner" class="loading-banner">最新のデータを取得しています...</div>
+
     <div class="tabs">
       <button class="tab active" onclick="showTab(event,'overview')">概要</button>
       <button class="tab" onclick="showTab(event,'questions')">問題別分析</button>
@@ -615,9 +630,10 @@
   </div>
 
   <script>
+    // ─── Google Apps Script (GAS) WebアプリのURL ───────────────────
     const GAS_URL = "https://script.google.com/macros/s/AKfycbwZ4IepgvVlcun3CX57gqG9hf86Rn5CWPdKvWJgl8jCRAs1Gbdw24UoW4zVIqo__h6UYA/exec";
-
-    // ─── データ構造 ───────────────────────────────────────────
+    
+    // ─── 初期データ構造 ───────────────────────────────────────────
     const defaultSurveys = [
       {
         id: 0,
@@ -657,6 +673,61 @@
     function getSurvey() { return surveys.find(s => s.id === activeSurveyId) || surveys[0]; }
     function get(id) { return document.getElementById(id); }
 
+    // ─── 【追加機能】GASからのデータ一括取得（読み込み） ───────────────
+    async function loadResponsesFromGAS() {
+      const banner = get('loadingBanner');
+      if (banner) banner.style.display = 'block';
+      
+      try {
+        // GASからJSONデータを取得
+        const response = await fetch(GAS_URL);
+        if (!response.ok) throw new Error("ネットワークエラーが発生しました");
+        const gasData = await response.json();
+        
+        if (gasData && gasData.length > 0) {
+          // いったんローカルの全アンケートの responses を初期化、またはデフォルトだけ残す
+          surveys.forEach(s => s.responses = []);
+          
+          // GASの行データを解析して該当するアンケートIDに振り分ける
+          gasData.forEach(row => {
+            const sId = parseInt(row.surveyId);
+            const targetSurvey = surveys.find(s => s.id === sId);
+            
+            if (targetSurvey) {
+              // answers文字列（"A,B,C..."）を配列に復元
+              const answersArray = row.answers ? row.answers.split(",") : [];
+              targetSurvey.responses.push({
+                answers: answersArray,
+                score: parseInt(row.score)
+              });
+            }
+          });
+          
+          // ローカルストレージにも同期して再描画
+          saveToStorage();
+          renderAll();
+          
+          if (banner) {
+            banner.style.background = '#e6f7ff';
+            banner.style.borderColor = '#91d5ff';
+            banner.style.color = '#0050b3';
+            banner.textContent = `最新のデータ（全${gasData.length}件）の同期に成功しました。`;
+            setTimeout(() => { banner.style.display = 'none'; }, 3000);
+          }
+        } else {
+          if (banner) banner.style.display = 'none';
+        }
+      } catch (error) {
+        console.error("GASからのデータ取得失敗:", error);
+        if (banner) {
+          banner.style.background = '#fff0f6';
+          banner.style.borderColor = '#ffadd2';
+          banner.style.color = '#c41d7f';
+          banner.textContent = '外部データの同期に失敗しました（ローカルデータのみで表示中）';
+        }
+      }
+    }
+
     // ─── 統計計算 ───────────────────────────────────────────
     function getOptionStats(survey) {
       return survey.questions.map((q, qi) => {
@@ -682,7 +753,7 @@
       const surveyItems = surveys.map(s => {
         const isActive = s.id === activeSurveyId;
         const isRenaming = s.id === renamingId;
-
+        
         let nameField = `<span class="survey-name" onclick="switchSurvey(${s.id})">${s.name}</span>`;
         if (isRenaming) {
           nameField = `
@@ -788,7 +859,6 @@
           const d = st.optionData[opt];
           const pct = sv.responses.length ? Math.round((d.count / sv.responses.length) * 100) : 0;
           const avgS = Math.round(d.avgScore);
-          const isBest = st.best === opt;
 
           let fillClass = 'none';
           if (d.count > 0) {
@@ -952,6 +1022,7 @@
       renderAdd();
     }
 
+    // ─── 【追加機能】GASへのデータ送信（追加） ─────────────────────────
     async function addResponse() {
       const sv = surveys.find(s => s.id === addTargetSurveyId) || getSurvey();
       const answers = sv.questions.map((_, i) => {
@@ -965,10 +1036,11 @@
       if (missing !== -1) { msg.style.color = '#c0392b'; msg.textContent = `Q${missing + 1}の選択肢を選んでください`; return; }
       if (isNaN(score) || score < 0 || score > 100) { msg.style.color = '#c0392b'; msg.textContent = '正解率を0〜100で入力してください'; return; }
 
-      msg.style.color = '#7ecfb8';
-      msg.textContent = '送信中...';
+      msg.style.color = '#d46b08';
+      msg.textContent = 'データベースに送信中...';
 
       try {
+        // GASのWebアプリへPOST送信
         const response = await fetch(GAS_URL, {
           method: "POST",
           body: JSON.stringify({
@@ -981,12 +1053,13 @@
 
         const result = await response.json();
         if (result.result === "success") {
+          // 通信成功時のみ、ローカルの配列オブジェクトにも追加
           sv.responses.push({ answers, score });
-
-          saveToStorage(); // 画面リロード時対策にローカルにも同期
-
+          
+          saveToStorage(); // ローカルストレージにも保存
+          
           msg.style.color = '#0a5e44';
-          msg.textContent = `外部データベースに保存しました！（合計 ${sv.responses.length} 件）`;
+          msg.textContent = `外部データベースへのデータ追加に成功しました！（合計 ${sv.responses.length} 件）`;
           renderAll();
           renderAdd();
         } else {
@@ -1000,7 +1073,7 @@
 
     function deleteResponse(i) {
       const sv = surveys.find(s => s.id === addTargetSurveyId) || getSurvey();
-      if (!confirm(`回答者${i + 1}のデータを削除しますか？`)) return;
+      if (!confirm(`回答者${i + 1}のデータを削除しますか？\n（※画面上の削除です。スプレッドシートの行は自動削除されません）`)) return;
       sv.responses.splice(i, 1);
 
       saveToStorage();
@@ -1099,7 +1172,11 @@
     }
 
     function renderAll() { renderOverview(); renderQuestions(); renderRanking(); }
+    
+    // ─── 初期実行 ───────────────────────────────────────────
     renderAll();
+    // ページロード時に自動的にGASから全ユーザーのデータを読み込む
+    window.addEventListener('DOMContentLoaded', loadResponsesFromGAS);
   </script>
 </body>
 
