@@ -101,12 +101,6 @@
       color: #083d2e;
     }
 
-    .metric-sub {
-      font-size: 11px;
-      color: #4aab8a;
-      margin-top: 2px;
-    }
-
     .q-card {
       background: #fff;
       border: 1px solid #9adfc8;
@@ -364,124 +358,6 @@
       color: #4aab8a;
     }
 
-    .survey-del {
-      padding: 2px 8px;
-      font-size: 11px;
-      border: 1px solid #9adfc8;
-      border-radius: 6px;
-      background: transparent;
-      cursor: pointer;
-      color: #4aab8a;
-    }
-
-    .survey-del:hover {
-      background: #e6f9f3;
-      color: #0d3d30;
-    }
-
-    .new-survey-form {
-      background: #fff;
-      border: 1px solid #9adfc8;
-      border-radius: 12px;
-      padding: 1rem 1.25rem;
-    }
-
-    .new-survey-form h3 {
-      font-size: 14px;
-      font-weight: 500;
-      margin-bottom: 14px;
-      color: #083d2e;
-    }
-
-    .form-row {
-      margin-bottom: 12px;
-    }
-
-    .form-label {
-      font-size: 12px;
-      color: #2a7a60;
-      margin-bottom: 5px;
-    }
-
-    input[type=text] {
-      padding: 6px 10px;
-      font-size: 13px;
-      border: 1px solid #9adfc8;
-      border-radius: 8px;
-      background: #fff;
-      color: #0d3d30;
-      width: 100%;
-    }
-
-    .q-builder {
-      margin-bottom: 14px;
-    }
-
-    .q-builder-row {
-      background: #e6f9f3;
-      border-radius: 8px;
-      padding: 10px 12px;
-      margin-bottom: 8px;
-    }
-
-    .q-builder-row .q-num-label {
-      font-size: 11px;
-      color: #4aab8a;
-      margin-bottom: 6px;
-    }
-
-    .options-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
-      margin-top: 6px;
-    }
-
-    .opt-input-wrap {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    .opt-letter {
-      font-size: 12px;
-      color: #2a7a60;
-      font-weight: 500;
-      width: 14px;
-      flex-shrink: 0;
-    }
-
-    .btn-add-q {
-      padding: 6px 14px;
-      font-size: 12px;
-      background: transparent;
-      border: 1px solid #7ecfb8;
-      border-radius: 8px;
-      cursor: pointer;
-      color: #2a7a60;
-      margin-bottom: 14px;
-    }
-
-    .btn-add-q:hover {
-      border-color: #2a7a60;
-    }
-
-    .btn-del-q {
-      padding: 2px 8px;
-      font-size: 11px;
-      border: 1px solid #9adfc8;
-      border-radius: 6px;
-      background: transparent;
-      cursor: pointer;
-      color: #4aab8a;
-      float: right;
-    }
-
-    .btn-del-q:hover {
-      background: #c8f0e4;
-      color: #0d3d30;
-    }
-
     .add-section {
       background: #fff;
       border: 1px solid #9adfc8;
@@ -574,22 +450,6 @@
       border-bottom: none;
     }
 
-    .del-btn {
-      margin-left: auto;
-      padding: 2px 8px;
-      font-size: 11px;
-      border: 1px solid #9adfc8;
-      border-radius: 6px;
-      background: transparent;
-      cursor: pointer;
-      color: #4aab8a;
-    }
-
-    .del-btn:hover {
-      background: #e6f9f3;
-      color: #0d3d30;
-    }
-
     .chart-wrap {
       position: relative;
       width: 100%;
@@ -605,7 +465,6 @@
       font-size: 13px;
       margin-bottom: 1rem;
       text-align: center;
-      display: none;
     }
   </style>
 </head>
@@ -615,7 +474,7 @@
     <h1>ノイミー推しメンクイズ回答分析💎</h1>
     <p class="subtitle">どの選択肢を選ぶと高スコアにつながるかを分析します</p>
     
-    <div id="loadingBanner" class="loading-banner">最新のデータを取得しています...</div>
+    <div id="loadingBanner" class="loading-banner">APIからアンケートと回答のデータを取得しています...</div>
 
     <div class="tabs">
       <button class="tab active" onclick="showTab(event,'overview')">概要</button>
@@ -630,106 +489,71 @@
   </div>
 
   <script>
-    // ─── Google Apps Script (GAS) WebアプリのURL ───────────────────
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzF6J7DVMb6bbh72NBvqPMGa1MnSkcgNdyO7-j7uLuK8V6xGxNKTxzs8hzXlfwRX75X-Q/exec";
+    // ─── 【重要】新しくデプロイしたGASのURLをここに貼り付けてください ───
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwEUXaeTGAYA_uYBwlwRJbL5TK-8kAvtlYlRYzQkx4PlnZ0N_HML1brYQ_-a8b0HESrRQ/exec";
     
-    // ─── 初期データ構造 ───────────────────────────────────────────
-    const defaultSurveys = [
-      {
-        id: 0,
-        name: "ノイミー クイズ",
-        questions: [
-          { id: 1, text: "ドラマで演じてみたい役は？", options: { A: "お姉さん", B: "お母さん", C: "妹", D: "ペット" } },
-          { id: 2, text: "自分だけゆずれないこだわりは", options: { A: "カレールーとご飯を別", B: "焼肉お肉韓国海苔", C: "コーヒーブラック", D: "ひきわり納豆" } },
-          { id: 3, text: "第一印象", options: { A: "おとなしい", B: "賢そう", C: "天然そう", D: "怖そ" } },
-          { id: 4, text: "直したいくせ", options: { A: "どこでも口笛", B: "物忘れ", C: "洗濯を眺める", D: "考えこと" } },
-          { id: 5, text: "お気に入り映画", options: { A: "ラピュタ", B: "トトロ", C: "宅急便", D: "千と千尋" } },
-          { id: 6, text: "一番最初に買ったコスメは？", options: { A: "チーク", B: "ファンデーション", C: "リップ", D: "アイシャドー" } },
-          { id: 7, text: "おきにい入りおもちゃ", options: { A: "めちゃん", B: "シルバニア", C: "たまごっち", D: "ぽぽちゃん" } },
-          { id: 8, text: "カラオケSong", options: { A: "夜明け", B: "夜にかける", C: "はなみずき", D: "そばかす" } },
-          { id: 9, text: "すきすマスター", options: { A: "ジャグリング", B: "マジック", C: "麻雀", D: "ダーツ" } },
-          { id: 10, text: "ノイミーは？", options: { A: "居場所", B: "宝物", C: "人生", D: "青春" } },
-        ],
-        responses: [
-          { answers: ["B", "A", "A", "C", "B", "C", "C", "B", "D", "A"], score: 10 },
-          { answers: ["C", "B", "A", "B", "A", "C", "B", "C", "D", "B"], score: 40 },
-          { answers: ["A", "D", "A", "B", "D", "C", "C", "B", "D", "B"], score: 50 },
-          { answers: ["D", "D", "C", "B", "A", "C", "D", "C", "A", "B"], score: 40 },
-          { answers: ["A", "B", "C", "D", "C", "C", "A", "D", "B", "D"], score: 40 },
-          { answers: ["A", "A", "D", "D", "D", "C", "B", "A", "C", "D"], score: 50 },
-        ],
-      }
-    ];
-
-    let surveys = JSON.parse(localStorage.getItem('noemie_surveys')) || defaultSurveys;
-    let activeSurveyId = parseInt(localStorage.getItem('noemie_active_id')) || surveys[0].id;
+    // ─── データ構造（初期状態は空、APIからロードする） ───────────────────
+    let surveys = [];
+    let activeSurveyId = 0;
     let scoreChart = null;
 
-    function saveToStorage() {
-      localStorage.setItem('noemie_surveys', JSON.stringify(surveys));
-      localStorage.setItem('noemie_active_id', activeSurveyId.toString());
+    function getSurvey() { 
+      return surveys.find(s => s.id === activeSurveyId) || surveys[0] || null; 
     }
-
-    function getSurvey() { return surveys.find(s => s.id === activeSurveyId) || surveys[0]; }
     function get(id) { return document.getElementById(id); }
 
-    // ─── 【追加機能】GASからのデータ一括取得（読み込み） ───────────────
-    async function loadResponsesFromGAS() {
+    // ─── 【一括管理】GASから質問と回答データをまとめて同期する ──────────────
+    async function loadDataFromGAS() {
       const banner = get('loadingBanner');
-      if (banner) banner.style.display = 'block';
+      if (banner) {
+        banner.style.display = 'block';
+        banner.textContent = 'APIからアンケートと回答のデータを取得しています...';
+      }
       
       try {
-        // GASからJSONデータを取得
         const response = await fetch(GAS_URL);
-        if (!response.ok) throw new Error("ネットワークエラーが発生しました");
+        if (!response.ok) throw new Error("ネットワークエラー");
         const gasData = await response.json();
         
         if (gasData && gasData.length > 0) {
-          // いったんローカルの全アンケートの responses を初期化、またはデフォルトだけ残す
-          surveys.forEach(s => s.responses = []);
+          // APIから取得した質問・回答データをそのままグローバル変数にセット
+          surveys = gasData;
           
-          // GASの行データを解析して該当するアンケートIDに振り分ける
-          gasData.forEach(row => {
-            const sId = parseInt(row.surveyId);
-            const targetSurvey = surveys.find(s => s.id === sId);
-            
-            if (targetSurvey) {
-              // answers文字列（"A,B,C..."）を配列に復元
-              const answersArray = row.answers ? row.answers.split(",") : [];
-              targetSurvey.responses.push({
-                answers: answersArray,
-                score: parseInt(row.score)
-              });
-            }
-          });
+          // アクティブIDをセット（記憶がなければ最初のアンケート）
+          const savedId = localStorage.getItem('noemie_active_id');
+          if (savedId && surveys.find(s => s.id === parseInt(savedId))) {
+            activeSurveyId = parseInt(savedId);
+          } else {
+            activeSurveyId = surveys[0].id;
+          }
           
-          // ローカルストレージにも同期して再描画
-          saveToStorage();
           renderAll();
           
           if (banner) {
             banner.style.background = '#e6f7ff';
             banner.style.borderColor = '#91d5ff';
             banner.style.color = '#0050b3';
-            banner.textContent = `最新のデータ（全${gasData.length}件）の同期に成功しました。`;
+            let totalResponses = surveys.reduce((acc, cur) => acc + cur.responses.length, 0);
+            banner.textContent = `APIと完全同期しました（アンケート数:${surveys.length}件、回答総数:${totalResponses}件）`;
             setTimeout(() => { banner.style.display = 'none'; }, 3000);
           }
         } else {
-          if (banner) banner.style.display = 'none';
+          if (banner) banner.textContent = 'APIから有効なデータが取得できませんでした。';
         }
       } catch (error) {
-        console.error("GASからのデータ取得失敗:", error);
+        console.error("API読み込み失敗:", error);
         if (banner) {
           banner.style.background = '#fff0f6';
           banner.style.borderColor = '#ffadd2';
           banner.style.color = '#c41d7f';
-          banner.textContent = '外部データの同期に失敗しました（ローカルデータのみで表示中）';
+          banner.textContent = '外部データの取得に失敗しました。スプレッドシートやGASのURLを確認してください。';
         }
       }
     }
 
     // ─── 統計計算 ───────────────────────────────────────────
     function getOptionStats(survey) {
+      if (!survey) return [];
       return survey.questions.map((q, qi) => {
         const optionData = {};
         ['A', 'B', 'C', 'D'].forEach(opt => {
@@ -746,46 +570,22 @@
     // ─── 概要の描画 ───────────────────────────────────────────
     function renderOverview() {
       const sv = getSurvey();
+      if (!sv) {
+        get('page-overview').innerHTML = '<div class="insight-box">データを読み込んでいます...</div>';
+        return;
+      }
       const count = sv.responses.length;
       const avg = count ? Math.round(sv.responses.reduce((s, r) => s + r.score, 0) / count) : 0;
       const high = count ? Math.max(...sv.responses.map(r => r.score)) : 0;
 
       const surveyItems = surveys.map(s => {
         const isActive = s.id === activeSurveyId;
-        const isRenaming = s.id === renamingId;
-        
-        let nameField = `<span class="survey-name" onclick="switchSurvey(${s.id})">${s.name}</span>`;
-        if (isRenaming) {
-          nameField = `
-            <div style="display:flex;gap:5px;flex:1;">
-              <input type="text" id="rename-input-${s.id}" value="${s.name}" style="padding:4px 8px;font-size:13px;">
-              <button class="survey-del" onclick="applyRename(${s.id})" style="color:#0a5e44;border-color:#5DCAA5;">保存</button>
-              <button class="survey-del" onclick="cancelRename()">取消</button>
-            </div>`;
-        }
-
         return `
-          <div class="survey-item ${isActive ? 'active-survey' : ''}">
-            ${nameField}
-            <span class="survey-meta">${s.responses.length}件の回答</span>
-            ${!isRenaming ? `<button class="survey-del" onclick="startRename(${s.id})">改名</button>` : ''}
-            ${surveys.length > 1 ? `<button class="survey-del" onclick="deleteSurvey(${s.id})">削除</button>` : ''}
+          <div class="survey-item ${isActive ? 'active-survey' : ''}" onclick="switchSurvey(${s.id})">
+            <span class="survey-name">${s.name}</span>
+            <span class="survey-meta">${s.responses.length}件の回答 / 設問数:${s.questions.length}</span>
           </div>`;
       }).join('');
-
-      const qBuilderRows = newSurveyQuestions.map((q, i) => `
-        <div class="q-builder-row">
-          ${newSurveyQuestions.length > 1 ? `<button class="btn-del-q" onclick="removeNewQ(${i})">削除</button>` : ''}
-          <div class="q-num-label">問題 ${i + 1}</div>
-          <input type="text" placeholder="質問文を入力してください" value="${q.text}" oninput="updateNewQ(${i}, 'text', this.value)">
-          <div class="options-grid">
-            ${['A', 'B', 'C', 'D'].map(o => `
-              <div class="opt-input-wrap">
-                <span class="opt-letter">${o}</span>
-                <input type="text" placeholder="選択肢 ${o}" value="${q.options[o]}" oninput="updateNewQ(${i}, 'opt_${o}', this.value)">
-              </div>`).join('')}
-          </div>
-        </div>`).join('');
 
       get('page-overview').innerHTML = `
         <div class="metrics">
@@ -796,25 +596,9 @@
         <div class="chart-wrap"><canvas id="scoreChart" height="140"></canvas></div>
         
         <div style="margin-top:2rem;">
-          <h3 style="font-size:14px;font-weight:500;margin-bottom:10px;color:#083d2e;">アンケートの切替</h3>
+          <h3 style="font-size:14px;font-weight:500;margin-bottom:10px;color:#083d2e;">アンケートの切替（スプレッドシート連動）</h3>
           <div class="surveys-list">${surveyItems}</div>
-        </div>
-
-        <div class="new-survey-form" style="margin-top:1.5rem;">
-          <h3>新しいアンケートを作成</h3>
-          <div class="form-row">
-            <div class="form-label">アンケート名</div>
-            <input type="text" id="newSurveyName" placeholder="例: 2026年最新クイズ">
-          </div>
-          <div class="q-builder">
-            <div class="form-label">問題の構成</div>
-            ${qBuilderRows}
-          </div>
-          <button class="btn-add-q" onclick="addNewQ()">＋ 問題を追加する</button>
-          <div style="margin-top:10px;">
-            <button class="btn" onclick="createSurvey()">アンケートを作成して切替</button>
-          </div>
-          <div id="surveyMsg" style="font-size:13px;margin-top:10px;min-height:18px;"></div>
+          <p style="font-size:11px;color:#2a7a60;line-height:1.4;">※新しい質問文やアンケートの追加・名前の変更は、スプレッドシートの「surveys」シートを編集してデプロイしてください。</p>
         </div>`;
 
       renderChart(sv.responses);
@@ -848,6 +632,7 @@
     // ─── 問題別分析の描画 ─────────────────────────────────────
     function renderQuestions() {
       const sv = getSurvey();
+      if (!sv) return;
       if (!sv.responses.length) {
         get('page-questions').innerHTML = '<div class="insight-box">データがまだ無いため、分析を表示できません。「データ追加」タブから回答を入力してください。</div>';
         return;
@@ -903,6 +688,7 @@
     // ─── 推奨選択肢の描画 ─────────────────────────────────────
     function renderRanking() {
       const sv = getSurvey();
+      if (!sv) return;
       if (!sv.responses.length) {
         get('page-ranking').innerHTML = '<div class="insight-box">データがまだ無いため、推奨選択肢を算出できません。</div>';
         return;
@@ -971,6 +757,10 @@
     let addTargetSurveyId = null;
 
     function renderAdd() {
+      if (surveys.length === 0) {
+        get('page-add').innerHTML = '<div class="insight-box">データを読み込んでいます...</div>';
+        return;
+      }
       if (addTargetSurveyId === null) addTargetSurveyId = activeSurveyId;
       const sv = surveys.find(s => s.id === addTargetSurveyId) || getSurvey();
 
@@ -991,7 +781,6 @@
           <span style="color:#083d2e;font-weight:500;width:70px;">回答者${i + 1}</span>
           <span style="letter-spacing:2px;">${r.answers.join(' ')}</span>
           <span style="margin-left:auto;font-weight:500;color:#083d2e;">${r.score}%</span>
-          <button class="del-btn" onclick="deleteResponse(${i})">削除</button>
         </div>`).join('');
 
       get('page-add').innerHTML = `
@@ -1022,7 +811,6 @@
       renderAdd();
     }
 
-    // ─── 【追加機能】GASへのデータ送信（追加） ─────────────────────────
     async function addResponse() {
       const sv = surveys.find(s => s.id === addTargetSurveyId) || getSurvey();
       const answers = sv.questions.map((_, i) => {
@@ -1040,7 +828,6 @@
       msg.textContent = 'データベースに送信中...';
 
       try {
-        // GASのWebアプリへPOST送信
         const response = await fetch(GAS_URL, {
           method: "POST",
           body: JSON.stringify({
@@ -1053,11 +840,7 @@
 
         const result = await response.json();
         if (result.result === "success") {
-          // 通信成功時のみ、ローカルの配列オブジェクトにも追加
           sv.responses.push({ answers, score });
-          
-          saveToStorage(); // ローカルストレージにも保存
-          
           msg.style.color = '#0a5e44';
           msg.textContent = `外部データベースへのデータ追加に成功しました！（合計 ${sv.responses.length} 件）`;
           renderAll();
@@ -1071,91 +854,9 @@
       }
     }
 
-    function deleteResponse(i) {
-      const sv = surveys.find(s => s.id === addTargetSurveyId) || getSurvey();
-      if (!confirm(`回答者${i + 1}のデータを削除しますか？\n（※画面上の削除です。スプレッドシートの行は自動削除されません）`)) return;
-      sv.responses.splice(i, 1);
-
-      saveToStorage();
-
-      renderAll(); renderAdd();
-    }
-
-    // ─── アンケート管理 ──────────────────────────────────────
-    let newSurveyQuestions = [{ text: '', options: { A: '', B: '', C: '', D: '' } }];
-    let renamingId = null;
-
-    function startRename(id) { renamingId = id; renderOverview(); }
-    function cancelRename() { renamingId = null; renderOverview(); }
-
-    function applyRename(id) {
-      const inp = get(`rename-input-${id}`);
-      const name = inp ? inp.value.trim() : '';
-      if (!name) return;
-      const sv = surveys.find(s => s.id === id);
-      if (sv) sv.name = name;
-      renamingId = null;
-
-      saveToStorage();
-
-      renderAll();
-      if (addTargetSurveyId === id) renderAdd();
-    }
-
-    function updateNewQ(i, field, val) {
-      if (field === 'text') newSurveyQuestions[i].text = val;
-      else newSurveyQuestions[i].options[field.split('_')[1]] = val;
-    }
-
-    function addNewQ() {
-      newSurveyQuestions.push({ text: '', options: { A: '', B: '', C: '', D: '' } });
-      renderOverview();
-    }
-
-    function removeNewQ(i) {
-      newSurveyQuestions.splice(i, 1);
-      renderOverview();
-    }
-
-    function createSurvey() {
-      const name = get('newSurveyName').value.trim();
-      const msg = get('surveyMsg');
-      if (!name) { msg.style.color = '#c0392b'; msg.textContent = 'アンケート名を入力してください'; return; }
-      for (let i = 0; i < newSurveyQuestions.length; i++) {
-        const q = newSurveyQuestions[i];
-        if (!q.text.trim()) { msg.style.color = '#c0392b'; msg.textContent = `Q${i + 1}の質問文を入力してください`; return; }
-        if (Object.values(q.options).some(o => !o.trim())) { msg.style.color = '#c0392b'; msg.textContent = `Q${i + 1}の選択肢をすべて入力してください`; return; }
-      }
-      const newId = Date.now();
-      surveys.push({
-        id: newId, name,
-        questions: newSurveyQuestions.map((q, i) => ({ id: i + 1, text: q.text, options: { ...q.options } })),
-        responses: [],
-      });
-      activeSurveyId = newId;
-      addTargetSurveyId = newId;
-      newSurveyQuestions = [{ text: '', options: { A: '', B: '', C: '', D: '' } }];
-
-      saveToStorage();
-
-      renderAll();
-    }
-
     function switchSurvey(id) {
       activeSurveyId = id;
       localStorage.setItem('noemie_active_id', id.toString());
-      renderAll();
-    }
-
-    function deleteSurvey(id) {
-      const sv = surveys.find(s => s.id === id);
-      if (!confirm(`「${sv?.name}」を削除しますか？\nこのアンケートのすべての回答データも削除されます。`)) return;
-      surveys = surveys.filter(s => s.id !== id);
-      if (activeSurveyId === id) activeSurveyId = surveys[0].id;
-      if (addTargetSurveyId === id) addTargetSurveyId = surveys[0].id;
-
-      saveToStorage();
-
       renderAll();
     }
 
@@ -1174,9 +875,8 @@
     function renderAll() { renderOverview(); renderQuestions(); renderRanking(); }
     
     // ─── 初期実行 ───────────────────────────────────────────
-    renderAll();
-    // ページロード時に自動的にGASから全ユーザーのデータを読み込む
-    window.addEventListener('DOMContentLoaded', loadResponsesFromGAS);
+    // ページロード時に自動的にGASからアンケート構造と回答の両方を1つのAPIから取得
+    window.addEventListener('DOMContentLoaded', loadDataFromGAS);
   </script>
 </body>
 
